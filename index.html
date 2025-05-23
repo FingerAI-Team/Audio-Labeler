@@ -8,121 +8,132 @@
         body {
             font-family: 'Noto Sans KR', sans-serif;
             margin: 0; padding: 0;
-            background: linear-gradient(120deg, #e3f0ff 0%, #f7f7f7 100%);
+            background: #f4f4f6;
         }
         .container {
             max-width: 1100px;
-            margin: 40px auto;
+            margin: 24px auto 24px auto;
             background: #fff;
-            padding: 40px 32px 32px 32px;
-            border-radius: 18px;
-            box-shadow: 0 6px 32px rgba(25, 118, 210, 0.10), 0 1.5px 6px rgba(0,0,0,0.04);
-        }
-        h1 {
-            margin-top: 0;
-            color: #1976d2;
-            font-weight: 700;
-            letter-spacing: -1px;
+            padding: 24px 48px 18px 48px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
         }
         h2 {
-            color: #333;
-            margin-top: 32px;
-            margin-bottom: 18px;
-            font-weight: 600;
+            color: #222;
+            margin-top: 10px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            font-size: 1.15em;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 6px;
         }
         table {
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin-bottom: 32px;
-            background: #fafcff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 1px 4px rgba(25,118,210,0.04);
+            border-collapse: collapse;
+            margin-bottom: 16px;
+            background: #fff;
         }
         th, td {
-            border-bottom: 1px solid #e3eaf2;
-            padding: 13px 10px;
+            border: 1px solid #d1d5db;
+            padding: 10px 10px;
             text-align: center;
+            font-size: 1em;
         }
         th {
-            background: #e3f0ff;
-            color: #1976d2;
+            background: #f3f4f6;
+            color: #1a237e;
             font-weight: 600;
         }
-        tr:last-child td {
-            border-bottom: none;
+        tr:nth-child(even) td {
+            background: #f8f9fa;
         }
-        tr:hover {
-            background: #f0f7ff;
+        tr:hover td {
+            background: #f0f4f8;
             transition: background 0.2s;
         }
         .audio-section {
-            margin-bottom: 32px;
-            background: #f7faff;
-            border-radius: 14px;
-            box-shadow: 0 1px 6px rgba(25,118,210,0.06);
-            padding: 28px 24px 18px 24px;
+            margin-bottom: 16px;
+            background: #fafbfc;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            box-shadow: none;
+            padding: 16px 16px 10px 16px;
+        }
+        .audio-section audio {
+            margin-bottom: 14px;
         }
         .tag-section {
             display: flex;
-            gap: 18px;
+            gap: 14px;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 14px;
             flex-wrap: wrap;
         }
         .tag-section label {
             font-weight: 500;
-            color: #1976d2;
+            color: #1a237e;
         }
         .tag-section input, .tag-section select {
-            padding: 7px 10px;
-            border: 1px solid #b6c6e3;
-            border-radius: 6px;
+            padding: 6px 10px;
+            border: 1px solid #b0b7c3;
+            border-radius: 4px;
             font-size: 1em;
             outline: none;
+            background: #fff;
             transition: border 0.2s;
         }
         .tag-section input:focus, .tag-section select:focus {
-            border: 1.5px solid #1976d2;
+            border: 1.5px solid #1a237e;
         }
         .actions {
-            margin-top: 24px;
+            margin-top: 10px;
             display: flex;
-            gap: 14px;
+            gap: 10px;
         }
         button {
-            padding: 9px 22px;
-            border-radius: 7px;
-            border: none;
-            background: linear-gradient(90deg, #1976d2 60%, #42a5f5 100%);
-            color: #fff;
-            font-weight: bold;
+            padding: 8px 18px;
+            border-radius: 4px;
+            border: 1px solid #b0b7c3;
+            background: #f3f4f6;
+            color: #1a237e;
+            font-weight: 600;
             font-size: 1em;
             cursor: pointer;
-            box-shadow: 0 1px 4px rgba(25,118,210,0.08);
-            transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+            box-shadow: none;
+            transition: background 0.2s, color 0.2s, border 0.2s;
         }
         button:hover:not(:disabled) {
-            background: linear-gradient(90deg, #1565c0 60%, #1976d2 100%);
-            box-shadow: 0 2px 8px rgba(25,118,210,0.13);
-            transform: translateY(-2px) scale(1.03);
+            background: #e3e7ef;
+            color: #0d47a1;
+            border: 1.5px solid #1a237e;
         }
         button:disabled {
-            background: #b0b0b0;
+            background: #e0e0e0;
+            color: #a0a0a0;
+            border: 1px solid #b0b7c3;
             cursor: not-allowed;
         }
+        .actions button, td button {
+            background: #1976d2;
+            color: #fff;
+            border: 1px solid #1976d2;
+        }
+        .actions button:hover, td button:hover {
+            background: #0d47a1;
+            color: #fff;
+            border: 1.5px solid #0d47a1;
+        }
         @media (max-width: 700px) {
-            .container { padding: 12px 2vw; }
-            .audio-section { padding: 12px 2vw; }
-            .tag-section { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .container { padding: 0 3vw; margin: 8px auto 8px auto; }
+            .audio-section { padding: 6px 2vw; }
+            .tag-section { flex-direction: column; align-items: flex-start; gap: 7px; }
             table, th, td { font-size: 0.97em; }
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>오디오 레이블링 툴</h1>
     <!-- 작업 파일 목록 -->
     <h2>작업 목록</h2>
     <table>
@@ -156,7 +167,7 @@
     <!-- 오디오 주석 작업 영역 -->
     <div class="audio-section">
         <h2>오디오 주석 작업</h2>
-        <audio controls style="width:100%; border-radius: 8px; background: #e3f0ff;">
+        <audio controls style="width:100%; border-radius: 4px; background: #f3f4f6;">
             <source src="#" type="audio/wav">
             브라우저가 오디오 태그를 지원하지 않습니다.
         </audio>
