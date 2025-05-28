@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import WaveformLabeler from "./WaveformLabeler";
 
 export default function Home() {
   return (
@@ -33,49 +34,8 @@ export default function Home() {
         </tbody>
       </table>
 
-      <div className="audio-section">
-        <h2>오디오 주석 작업</h2>
-        <audio controls style={{ width: "100%", borderRadius: "5px", background: "#f3f4f6" }}>
-          <source src="#" type="audio/wav" />
-          브라우저가 오디오 태그를 지원하지 않습니다.
-        </audio>
-        <div className="tag-section">
-          <label>구간 선택: </label>
-          <input type="number" min="0" placeholder="시작 (초)" /> ~
-          <input type="number" min="0" placeholder="끝 (초)" />
-          <label>발화자:</label>
-          <select>
-            <option>화자1</option>
-            <option>화자2</option>
-            <option>기타</option>
-          </select>
-          <button>구간 추가</button>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>시작</th>
-              <th>끝</th>
-              <th>발화자</th>
-              <th>삭제</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1.2</td>
-              <td>3.5</td>
-              <td>화자1</td>
-              <td>
-                <button>삭제</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="actions">
-          <button>주석 저장</button>
-          <button>다운로드</button>
-        </div>
-      </div>
+      <WaveformLabeler />
+
       <style jsx global>{`
         body {
           font-family: 'Noto Sans KR', sans-serif;
@@ -128,39 +88,22 @@ export default function Home() {
           transition: background 0.2s;
         }
         .audio-section {
-          margin-top: 22px;
-          margin-bottom: 16px;
-          background: #fafbfc;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
-          box-shadow: none;
-          padding: 10px 8px 8px 8px;
+          /* 삭제됨 */
         }
         .audio-section audio {
-          margin-bottom: 20px;
+          /* 삭제됨 */
         }
         .tag-section {
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          margin-bottom: 14px;
-          flex-wrap: wrap;
+          /* 삭제됨 */
         }
         .tag-section label {
-          font-weight: 500;
-          color: #1a237e;
+          /* 삭제됨 */
         }
         .tag-section input, .tag-section select {
-          padding: 8px 12px;
-          border: 1.2px solid #b0b7c3;
-          border-radius: 5px;
-          font-size: 1em;
-          outline: none;
-          background: #fff;
-          transition: border 0.2s;
+          /* 삭제됨 */
         }
         .tag-section input:focus, .tag-section select:focus {
-          border: 1.5px solid #1a237e;
+          /* 삭제됨 */
         }
         .actions {
           margin-top: 16px;
