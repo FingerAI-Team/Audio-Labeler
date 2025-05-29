@@ -1,40 +1,89 @@
 "use client";
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import WaveformLabeler from "./WaveformLabeler";
+import FileMetaPanel from "./FileMetaPanel";
 
 export default function Home() {
+  const [files, setFiles] = useState([]); // [{file, url, meta: {purpose, desc, participants}}]
+  const [selectedIdx, setSelectedIdx] = useState(null);
+  const fileInputRef = useRef();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const showGuide = files.length === 0 || selectedIdx == null;
+
+  // 파일 업로드 핸들러
+  const handleUpload = (e) => {
+    const newFiles = Array.from(e.target.files).map(file => ({
+      file,
+      url: URL.createObjectURL(file),
+      meta: { purpose: '', desc: '', participants: 1 }
+    }));
+    setFiles(prev => {
+      const updated = [...prev, ...newFiles];
+      setSelectedIdx(updated.length - 1);
+      return updated;
+    });
+    e.target.value = '';
+  };
+
+  // 메타데이터 변경 핸들러
+  const handleMetaChange = (idx, key, value) => {
+    setFiles(prev => prev.map((f, i) => i === idx ? { ...f, meta: { ...f.meta, [key]: value } } : f));
+  };
+
+  // 파일 삭제
+  const handleDelete = (idx) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+    if (selectedIdx === idx) setSelectedIdx(null);
+  };
+
+  // 저장/다운로드 (예: JSON)
+  const handleDownload = () => {
+    if (selectedIdx == null) return;
+    const data = files[selectedIdx];
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.file.name}_meta.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="container">
-      <h2>작업 목록</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>파일명</th>
-            <th>상태</th>
-            <th>담당자</th>
-            <th>진행률</th>
-            <th>작업</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>audio1.wav</td>
-            <td>미작업</td>
-            <td>홍길동</td>
-            <td>0%</td>
-            <td><button>작업 시작</button></td>
-          </tr>
-          <tr>
-            <td>audio2.wav</td>
-            <td>작업중</td>
-            <td>김철수</td>
-            <td>50%</td>
-            <td><button>계속 작업</button></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <WaveformLabeler />
+      <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', marginBottom: 18 }}>
+        <input
+          type="file"
+          accept="audio/*"
+          multiple
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleUpload}
+        />
+      </div>
+      <FileMetaPanel
+        file={selectedIdx != null && files[selectedIdx] ? files[selectedIdx].file : undefined}
+        description={selectedIdx != null && files[selectedIdx] ? files[selectedIdx].meta.desc : ''}
+        onDescriptionChange={desc => handleMetaChange(selectedIdx, 'desc', desc)}
+        onDelete={() => handleDelete(selectedIdx)}
+        onUpload={() => fileInputRef.current && fileInputRef.current.click()}
+        onSave={() => {}}
+        onDownload={handleDownload}
+        showGuide={showGuide}
+        fileInputRef={fileInputRef}
+        onPrev={() => setSelectedIdx(idx => (idx > 0 ? idx - 1 : idx))}
+        onNext={() => setSelectedIdx(idx => (idx < files.length - 1 ? idx + 1 : idx))}
+        disablePrev={selectedIdx == null || selectedIdx <= 0}
+        disableNext={selectedIdx == null || selectedIdx >= files.length - 1}
+      />
+      <WaveformLabeler
+        key={selectedIdx}
+        audioUrl={selectedIdx != null && files[selectedIdx] ? files[selectedIdx].url : undefined}
+        audioFile={selectedIdx != null && files[selectedIdx] ? files[selectedIdx].file : undefined}
+        showSample={false}
+        showGuide={showGuide}
+        onPlayingChange={setIsPlaying}
+      />
 
       <style jsx global>{`
         body {
@@ -53,15 +102,6 @@ export default function Home() {
           border-radius: 8px;
           border: 1px solid #d1d5db;
           box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-        }
-        h2 {
-          color: #222;
-          margin-top: 0;
-          margin-bottom: 10px;
-          font-size: 1.12em;
-          padding-bottom: 5px;
-          font-weight: 700;
-          border-bottom: 2px solid #e5e7eb;
         }
         table {
           width: 100%;
@@ -86,24 +126,6 @@ export default function Home() {
         tr:hover td {
           background: #f0f4f8;
           transition: background 0.2s;
-        }
-        .audio-section {
-          /* 삭제됨 */
-        }
-        .audio-section audio {
-          /* 삭제됨 */
-        }
-        .tag-section {
-          /* 삭제됨 */
-        }
-        .tag-section label {
-          /* 삭제됨 */
-        }
-        .tag-section input, .tag-section select {
-          /* 삭제됨 */
-        }
-        .tag-section input:focus, .tag-section select:focus {
-          /* 삭제됨 */
         }
         .actions {
           margin-top: 16px;
@@ -146,9 +168,15 @@ export default function Home() {
         }
         @media (max-width: 700px) {
           .container { padding: 0 3vw; margin: 8px auto 8px auto; width: 98%; font-size: 0.98em; }
-          .audio-section { padding: 8px 2vw; margin-top: 18px; margin-bottom: 16px; }
-          .tag-section { flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
           table, th, td { font-size: 0.97em; }
+        }
+        textarea::-webkit-scrollbar { display: none; }
+        textarea.centered-placeholder::placeholder {
+          text-align: center;
+          vertical-align: middle;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
       `}</style>
     </div>

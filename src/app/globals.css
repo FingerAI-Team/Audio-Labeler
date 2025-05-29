@@ -44,3 +44,32 @@ a {
 .waveform-container:focus {
   outline: none;
 }
+
+.ws-timeline-secondary-label {
+  display: none !important;
+}
+.ws-timeline-tick {
+  height: 10px !important;
+  border-left: 1px solid #bbb !important;
+  margin-left: 0;
+}
+.ws-timeline-primary-tick {
+  height: 18px !important;
+  border-left: 2px solid #222 !important;
+  margin-left: 0;
+}
+.ws-timeline-label {
+  top: -2px !important;
+  left: 50% !important;
+  transform: translate(-50%, -100%) !important;
+  font-family: monospace;
+  font-size: 12px !important;
+  color: #222 !important;
+  background: transparent !important;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  padding: 0 2px;
+  pointer-events: none;
+  user-select: none;
+  text-shadow: none !important;
+}
