@@ -4,10 +4,11 @@ import WaveformLabeler from "./WaveformLabeler";
 import FileMetaPanel from "./FileMetaPanel";
 
 export default function Home() {
-  const [files, setFiles] = useState([]); // [{file, url, meta: {purpose, desc, participants}}]
+  const [files, setFiles] = useState([]); // [{file, url, meta: {purpose, desc, participants}, labels: {speakers, regions}}]
   const [selectedIdx, setSelectedIdx] = useState(null);
   const fileInputRef = useRef();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [savedStates, setSavedStates] = useState({}); // 각 파일의 저장된 상태를 추적
   const showGuide = files.length === 0 || selectedIdx == null;
 
   // 파일 업로드 핸들러
@@ -15,7 +16,11 @@ export default function Home() {
     const newFiles = Array.from(e.target.files).map(file => ({
       file,
       url: URL.createObjectURL(file),
-      meta: { purpose: '', desc: '', participants: 1 }
+      meta: { purpose: '', desc: '', participants: 2 }, // 기본 화자 수 2로 시작
+      labels: {
+        speakers: ['Speaker A', 'Speaker B'],
+        regions: []
+      }
     }));
     setFiles(prev => {
       const updated = [...prev, ...newFiles];
@@ -28,23 +33,73 @@ export default function Home() {
   // 메타데이터 변경 핸들러
   const handleMetaChange = (idx, key, value) => {
     setFiles(prev => prev.map((f, i) => i === idx ? { ...f, meta: { ...f.meta, [key]: value } } : f));
+    // 메타데이터가 변경되면 해당 파일의 저장 상태를 false로 설정
+    setSavedStates(prev => ({ ...prev, [idx]: false }));
+  };
+
+  // 레이블링 데이터 변경 핸들러
+  const handleLabelsChange = (labels) => {
+    if (selectedIdx == null) return;
+    
+    setFiles(prev => {
+      const currentFile = prev[selectedIdx];
+      // 데이터가 실제로 변경되지 않았다면 이전 상태 그대로 반환
+      if (JSON.stringify(currentFile.labels) === JSON.stringify(labels)) {
+        return prev;
+      }
+
+      // 파일 상태와 저장 상태를 한 번에 업데이트
+      const speakerCount = labels.speakers.length;
+      const newFiles = prev.map((f, i) => 
+        i === selectedIdx 
+          ? {
+              ...f,
+              labels: { ...labels },
+              meta: { ...f.meta, participants: speakerCount }
+            }
+          : f
+      );
+
+      // 저장 상태도 함께 업데이트
+      setSavedStates(current => ({ ...current, [selectedIdx]: false }));
+      
+      return newFiles;
+    });
   };
 
   // 파일 삭제
   const handleDelete = (idx) => {
     setFiles(prev => prev.filter((_, i) => i !== idx));
+    setSavedStates(prev => {
+      const newSavedStates = { ...prev };
+      delete newSavedStates[idx];
+      return newSavedStates;
+    });
     if (selectedIdx === idx) setSelectedIdx(null);
   };
 
-  // 저장/다운로드 (예: JSON)
+  // 저장 핸들러 (상태 저장만)
+  const handleSave = () => {
+    if (selectedIdx == null) return;
+    // 현재 선택된 파일의 상태를 저장됨으로 표시
+    setSavedStates(prev => ({ ...prev, [selectedIdx]: true }));
+  };
+
+  // 다운로드 핸들러
   const handleDownload = () => {
     if (selectedIdx == null) return;
     const data = files[selectedIdx];
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const downloadData = {
+      filename: data.file.name,
+      meta: data.meta,
+      labels: data.labels,
+      timestamp: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(downloadData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${data.file.name}_meta.json`;
+    a.download = `${data.file.name}_data.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -67,7 +122,7 @@ export default function Home() {
         onDescriptionChange={desc => handleMetaChange(selectedIdx, 'desc', desc)}
         onDelete={() => handleDelete(selectedIdx)}
         onUpload={() => fileInputRef.current && fileInputRef.current.click()}
-        onSave={() => {}}
+        onSave={handleSave}
         onDownload={handleDownload}
         showGuide={showGuide}
         fileInputRef={fileInputRef}
@@ -75,6 +130,7 @@ export default function Home() {
         onNext={() => setSelectedIdx(idx => (idx < files.length - 1 ? idx + 1 : idx))}
         disablePrev={selectedIdx == null || selectedIdx <= 0}
         disableNext={selectedIdx == null || selectedIdx >= files.length - 1}
+        isSaved={selectedIdx != null ? savedStates[selectedIdx] : false}
       />
       <WaveformLabeler
         key={selectedIdx}
@@ -83,6 +139,7 @@ export default function Home() {
         showSample={false}
         showGuide={showGuide}
         onPlayingChange={setIsPlaying}
+        onLabelsChange={handleLabelsChange}
       />
 
       <style jsx global>{`

@@ -1,4 +1,7 @@
+"use client";
 import React from "react";
+import RewindIcon from './icons/left.svg';
+import ForwardIcon from './icons/right.svg';
 
 export default function FileMetaPanel({
   file,
@@ -13,7 +16,8 @@ export default function FileMetaPanel({
   onPrev,
   onNext,
   disablePrev,
-  disableNext
+  disableNext,
+  isSaved
 }) {
   return (
     <div style={{
@@ -86,17 +90,18 @@ export default function FileMetaPanel({
               border: '1.2px solid #b0b7c3',
               background: '#fff',
               color: disablePrev ? '#bbb' : '#1976d2',
-              fontSize: 20,
-              fontWeight: 700,
               cursor: disablePrev ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-              opacity: disablePrev ? 0.5 : 1
+              opacity: disablePrev ? 0.5 : 1,
+              padding: 0
             }}
             aria-label="이전 파일"
-          >&#x25C0;</button>
+          >
+            <RewindIcon width={16} height={16} />
+          </button>
           <button
             onClick={onNext}
             disabled={disableNext}
@@ -107,17 +112,18 @@ export default function FileMetaPanel({
               border: '1.2px solid #b0b7c3',
               background: '#fff',
               color: disableNext ? '#bbb' : '#1976d2',
-              fontSize: 20,
-              fontWeight: 700,
               cursor: disableNext ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-              opacity: disableNext ? 0.5 : 1
+              opacity: disableNext ? 0.5 : 1,
+              padding: 0
             }}
             aria-label="다음 파일"
-          >&#x25B6;</button>
+          >
+            <ForwardIcon width={16} height={16} />
+          </button>
         </div>
         {showGuide && (
           <div style={{
@@ -171,23 +177,30 @@ export default function FileMetaPanel({
         >upload</button>
         <button
           onClick={onSave}
-          disabled={showGuide}
+          disabled={showGuide || isSaved}
           style={{
             width: 110,
             fontSize: 17,
             borderRadius: 7,
-            border: '1.2px solid #b0b7c3',
-            background: '#f7f7f7',
-            color: '#444',
+            border: '1.2px solid',
+            borderColor: isSaved ? '#4caf50' : '#b0b7c3',
+            background: isSaved ? '#e8f5e9' : '#f7f7f7',
+            color: isSaved ? '#2e7d32' : '#444',
             fontWeight: 500,
             padding: '7px 0',
-            cursor: showGuide ? 'not-allowed' : 'pointer',
-            opacity: showGuide ? 0.5 : 1
+            cursor: showGuide || isSaved ? 'not-allowed' : 'pointer',
+            opacity: showGuide ? 0.5 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6
           }}
-        >save</button>
+        >
+          {isSaved ? '✓ saved' : 'save'}
+        </button>
         <button
           onClick={onDownload}
-          disabled={showGuide}
+          disabled={showGuide || !isSaved}
           style={{
             width: 110,
             fontSize: 17,
@@ -197,8 +210,8 @@ export default function FileMetaPanel({
             color: '#444',
             fontWeight: 500,
             padding: '7px 0',
-            cursor: showGuide ? 'not-allowed' : 'pointer',
-            opacity: showGuide ? 0.5 : 1
+            cursor: showGuide || !isSaved ? 'not-allowed' : 'pointer',
+            opacity: showGuide || !isSaved ? 0.5 : 1
           }}
         >download</button>
         <button
