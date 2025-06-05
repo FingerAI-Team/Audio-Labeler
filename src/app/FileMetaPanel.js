@@ -7,17 +7,7 @@ export default function FileMetaPanel({
   file,
   description,
   onDescriptionChange,
-  onDelete,
-  onUpload,
-  onSave,
-  onDownload,
-  showGuide,
-  fileInputRef,
-  onPrev,
-  onNext,
-  disablePrev,
-  disableNext,
-  isSaved
+  showGuide
 }) {
   return (
     <div style={{
@@ -31,15 +21,18 @@ export default function FileMetaPanel({
       border: '1px solid #e5e7eb',
       padding: 0,
       position: 'relative',
-      minHeight: 140
+      minHeight: 220  ,
+      minWidth: 500,
+      flex: 2,
+      boxSizing: 'border-box',
     }}>
       {/* 왼쪽: 파일 정보/설명 (오버레이 포함) */}
-      <div style={{ flex: 1, padding: '12px 24px 24px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', position: 'relative', minHeight: 120 }}>
+      <div style={{ flex: 1, padding: '40px 24px 40px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', position: 'relative', minHeight: 160 }}>
         <div style={{ opacity: showGuide ? 0.3 : 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 17, marginBottom: 8, color: '#555', fontWeight: 500 }}>
             Filename:
             <div style={{
-              width: 420,
+              width: 500,
               height: 40,
               display: 'flex',
               alignItems: 'center',
@@ -61,7 +54,7 @@ export default function FileMetaPanel({
               onChange={e => onDescriptionChange?.(e.target.value)}
               placeholder="ex) 2025-01-01 meeting with company A"
               style={{
-                width: 420,
+                width: 500,
                 height: 40,
                 fontSize: 15,
                 border: '1px solid #ccc',
@@ -77,53 +70,6 @@ export default function FileMetaPanel({
               }}
             />
           </div>
-        </div>
-        {/* 좌우 화살표 버튼 */}
-        <div style={{ position: 'absolute', right: 24, bottom: 18, display: 'flex', gap: 8, zIndex: 20 }}>
-          <button
-            onClick={onPrev}
-            disabled={disablePrev}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              border: '1.2px solid #b0b7c3',
-              background: '#fff',
-              color: disablePrev ? '#bbb' : '#1976d2',
-              cursor: disablePrev ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-              opacity: disablePrev ? 0.5 : 1,
-              padding: 0
-            }}
-            aria-label="이전 파일"
-          >
-            <RewindIcon width={16} height={16} />
-          </button>
-          <button
-            onClick={onNext}
-            disabled={disableNext}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              border: '1.2px solid #b0b7c3',
-              background: '#fff',
-              color: disableNext ? '#bbb' : '#1976d2',
-              cursor: disableNext ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-              opacity: disableNext ? 0.5 : 1,
-              padding: 0
-            }}
-            aria-label="다음 파일"
-          >
-            <ForwardIcon width={16} height={16} />
-          </button>
         </div>
         {showGuide && (
           <div style={{
@@ -147,89 +93,6 @@ export default function FileMetaPanel({
             Welcome to Audio Labeler !! Please Upload audio file
           </div>
         )}
-      </div>
-      {/* 오른쪽: 버튼 그룹 (항상 보임) */}
-      <div style={{
-        minWidth: 140,
-        borderLeft: '1px solid #e0e0e0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 18px 18px 18px',
-        gap: 12,
-        position: 'relative'
-      }}>
-        <button
-          onClick={() => fileInputRef?.current?.click()}
-          style={{
-            width: 110,
-            fontSize: 17,
-            borderRadius: 7,
-            border: '1.2px solid #b0b7c3',
-            background: '#f7f7f7',
-            color: '#1976d2',
-            fontWeight: 600,
-            padding: '7px 0',
-            cursor: 'pointer',
-            marginBottom: 2
-          }}
-        >upload</button>
-        <button
-          onClick={onSave}
-          disabled={showGuide || isSaved}
-          style={{
-            width: 110,
-            fontSize: 17,
-            borderRadius: 7,
-            border: '1.2px solid',
-            borderColor: isSaved ? '#4caf50' : '#b0b7c3',
-            background: isSaved ? '#e8f5e9' : '#f7f7f7',
-            color: isSaved ? '#2e7d32' : '#444',
-            fontWeight: 500,
-            padding: '7px 0',
-            cursor: showGuide || isSaved ? 'not-allowed' : 'pointer',
-            opacity: showGuide ? 0.5 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6
-          }}
-        >
-          {isSaved ? '✓ saved' : 'save'}
-        </button>
-        <button
-          onClick={onDownload}
-          disabled={showGuide || !isSaved}
-          style={{
-            width: 110,
-            fontSize: 17,
-            borderRadius: 7,
-            border: '1.2px solid #b0b7c3',
-            background: '#f7f7f7',
-            color: '#444',
-            fontWeight: 500,
-            padding: '7px 0',
-            cursor: showGuide || !isSaved ? 'not-allowed' : 'pointer',
-            opacity: showGuide || !isSaved ? 0.5 : 1
-          }}
-        >download</button>
-        <button
-          onClick={onDelete}
-          disabled={showGuide}
-          style={{
-            width: 110,
-            fontSize: 17,
-            borderRadius: 7,
-            border: '1.2px solid #b0b7c3',
-            background: '#f7f7f7',
-            color: '#444',
-            fontWeight: 500,
-            padding: '7px 0',
-            cursor: showGuide ? 'not-allowed' : 'pointer',
-            opacity: showGuide ? 0.5 : 1
-          }}
-        >delete</button>
       </div>
     </div>
   );

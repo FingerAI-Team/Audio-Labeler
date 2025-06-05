@@ -9,6 +9,14 @@ import PauseIcon from './icons/pause.svg';
 import SettingIcon from './icons/setting.svg';
 import LoadingIcon from './icons/loading.svg';
 import AnnotationPanel from './AnnotationPanel';
+import SpeakerManager from './components/SpeakerManager';
+import { speakerColors, defaultSpeakerColor } from "../constants/waveformColors";
+import { regionStyles } from "../constants/waveformStyles";
+import { formatTimeFull } from "../utils/timeFormat";
+import useWaveform from "../hooks/useWaveform";
+import useRegions from "../hooks/useRegions";
+import RegionList from "../components/RegionList";
+import RegionEditor from "../components/RegionEditor";
 
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', function(e) {
@@ -21,84 +29,97 @@ if (typeof window !== 'undefined') {
   });
 }
 
-function formatTimeFull(t) {
-  const hours = String(Math.floor(t / 3600)).padStart(2, '0');
-  const min = String(Math.floor((t % 3600) / 60)).padStart(2, '0');
-  const sec = String(Math.floor(t % 60)).padStart(2, '0');
-  const ms = String(Math.floor((t % 1) * 1000)).padStart(3, '0');
-  return `${hours}:${min}:${sec}.${ms}`;
-}
-
 const WAVEFORM_HEIGHT = 100; // 원하는 값으로 한 번에 관리
+export default function WaveformLabeler(props) {
+  // 기존 props 분해
+  const { audioUrl, showSample, showGuide, onPlayingChange, onLabelsChange } = props;
 
-// 구간 스타일 상수
-const regionStyles = {
-  default: {
-    color: 'rgba(120, 120, 120, 0.18)',
-    borderColor: 'rgba(120, 120, 120, 0.25)',
-    borderWidth: 2
-  },
-  selected: {
-    color: 'rgba(25, 118, 210, 0.35)',
-    borderColor: 'rgba(25, 118, 210, 0.45)',
-    borderWidth: 2
-  }
-};
+  // 파형 관련 훅 사용
+  const [isLoading, setIsLoading] = useState(false);
+  const {
+    containerRef,
+    wavesurferRef,
+    regionsPluginRef,
+    currentTime,
+    setCurrentTime,
+  } = useWaveform({
+    audioUrl,
+    showSample,
+    WAVEFORM_HEIGHT,
+    setIsLoading,
+  });
 
-// 화자별 색상 매핑
-const speakerColors = {
-  'Speaker A': { 
-    default: { color: 'rgba(25, 118, 210, 0.25)', borderColor: '#1976d2' },
-    selected: { color: 'rgba(25, 118, 210, 0.4)', borderColor: '#1976d2' }
-  },
-  'Speaker B': { 
-    default: { color: 'rgba(76, 175, 80, 0.25)', borderColor: '#4caf50' },
-    selected: { color: 'rgba(76, 175, 80, 0.4)', borderColor: '#4caf50' }
-  },
-  'Speaker C': { 
-    default: { color: 'rgba(255, 152, 0, 0.25)', borderColor: '#ff9800' },
-    selected: { color: 'rgba(255, 152, 0, 0.4)', borderColor: '#ff9800' }
-  },
-  'Speaker D': { 
-    default: { color: 'rgba(244, 67, 54, 0.25)', borderColor: '#f44336' },
-    selected: { color: 'rgba(244, 67, 54, 0.4)', borderColor: '#f44336' }
-  },
-  'Speaker E': { 
-    default: { color: 'rgba(156, 39, 176, 0.25)', borderColor: '#9c27b0' },
-    selected: { color: 'rgba(156, 39, 176, 0.4)', borderColor: '#9c27b0' }
-  },
-  'Speaker F': {
-    default: { color: 'rgba(121, 85, 72, 0.25)', borderColor: '#795548' },
-    selected: { color: 'rgba(121, 85, 72, 0.4)', borderColor: '#795548' }
-  },
-  'Speaker G': {
-    default: { color: 'rgba(0, 150, 136, 0.25)', borderColor: '#009688' },
-    selected: { color: 'rgba(0, 150, 136, 0.4)', borderColor: '#009688' }
-  },
-  'Speaker H': {
-    default: { color: 'rgba(63, 81, 181, 0.25)', borderColor: '#3f51b5' },
-    selected: { color: 'rgba(63, 81, 181, 0.4)', borderColor: '#3f51b5' }
-  },
-  'Speaker I': {
-    default: { color: 'rgba(233, 30, 99, 0.25)', borderColor: '#e91e63' },
-    selected: { color: 'rgba(233, 30, 99, 0.4)', borderColor: '#e91e63' }
-  },
-  'Speaker J': {
-    default: { color: 'rgba(158, 158, 158, 0.25)', borderColor: '#9e9e9e' },
-    selected: { color: 'rgba(158, 158, 158, 0.4)', borderColor: '#9e9e9e' }
-  }
-};
+  // 1. 먼저 상태 선언
+  const [selectedRegionId, setSelectedRegionId] = useState(null);
+  const [highlightedSpeaker, setHighlightedSpeaker] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-// 기본 색상 (색상이 정의되지 않은 화자용)
-const defaultSpeakerColor = {
-  default: { color: 'rgba(158, 158, 158, 0.25)', borderColor: '#9e9e9e' },
-  selected: { color: 'rgba(158, 158, 158, 0.4)', borderColor: '#9e9e9e' }
-};
+  // 2. getRegionStyle 선언 (이 상태들을 의존성으로)
+  const [hiddenSpeakers, setHiddenSpeakers] = useState(new Set());
+  const getRegionStyle = useCallback((regionId, speaker) => {
+    const isSelected = regionId === selectedRegionId;
+    const isHighlighted = speaker === highlightedSpeaker;
+    let style;
+    if (!speaker) {
+      style = {
+        ...regionStyles.default,
+        ...(isSelected ? regionStyles.selected : {}),
+        opacity: highlightedSpeaker ? 0.3 : 1
+      };
+    } else {
+      const speakerColor = speakerColors[speaker] || defaultSpeakerColor;
+      const baseStyle = isSelected ? speakerColor.selected : speakerColor.default;
+      const rgbaMatch = baseStyle.color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      let borderColor = baseStyle.color;
+      if (rgbaMatch) {
+        const [_, r, g, b] = rgbaMatch;
+        borderColor = `rgba(${r}, ${g}, ${b}, 0.35)`;
+      }
+      style = {
+        color: baseStyle.color,
+        borderColor: borderColor,
+        borderWidth: 2,
+        opacity: highlightedSpeaker ? (isHighlighted ? 1 : 0.3) : 1,
+        handleStyle: {
+          left: {
+            backgroundColor: borderColor,
+            width: '4px',
+            height: '100%',
+            cursor: 'ew-resize'
+          },
+          right: {
+            backgroundColor: borderColor,
+            width: '4px',
+            height: '100%',
+            cursor: 'ew-resize'
+          }
+        }
+      };
+    }
+    // 숨김 처리
+    if (speaker && hiddenSpeakers.has(speaker)) {
+      style = { ...style, opacity: 0, pointerEvents: 'none' };
+    }
+    return style;
+  }, [selectedRegionId, highlightedSpeaker, hiddenSpeakers]);
 
-export default function WaveformLabeler({ audioUrl, audioFile, showSample, showGuide, onPlayingChange, fileInputRef, onLabelsChange }) {
-  const containerRef = useRef(null);
-  const wavesurferRef = useRef(null);
-  const regionsPluginRef = useRef(null);
+  // 3. useRegions에 상태와 set함수, getRegionStyle을 모두 넘김
+  const {
+    speakerRegions,
+    setSpeakerRegions,
+    handleRegionClick,
+    handleRegionRemoved,
+    updateAllRegionStyles,
+  } = useRegions({
+    regionsPluginRef,
+    wavesurferRef,
+    getRegionStyle,
+    selectedRegionId,
+    setSelectedRegionId,
+    highlightedSpeaker,
+    setHighlightedSpeaker,
+  });
+
   const [hover, setHover] = useState(null);
   const [dragStart, setDragStart] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -107,86 +128,15 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
   // 화자 관련 상태
   const [speakers, setSpeakers] = useState(['Speaker A', 'Speaker B']);
   const [selectedSpeaker, setSelectedSpeaker] = useState('Speaker A');
-  const [highlightedSpeaker, setHighlightedSpeaker] = useState(null);
-  const [speakerRegions, setSpeakerRegions] = useState({});
   const [isInitialized, setIsInitialized] = useState(false);
 
   const minRegionLength = 1.0;
 
-  const [selectedRegionId, setSelectedRegionId] = useState(null);
-  const [currentTime, setCurrentTime] = useState(0);
   const [showSpeedSetting, setShowSpeedSetting] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1.0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [playingRegion, setPlayingRegion] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
   // 구간 스타일 적용 함수 수정
-  const getRegionStyle = useCallback((regionId, speaker) => {
-    const isSelected = regionId === selectedRegionId;
-    const isHighlighted = speaker === highlightedSpeaker;
-    
-    if (!speaker) {
-      const style = {
-        ...regionStyles.default,
-        ...(isSelected ? regionStyles.selected : {}),
-        opacity: highlightedSpeaker ? 0.3 : 1
-      };
-
-      // 핸들 스타일 추가
-      style.handleStyle = {
-        left: {
-          backgroundColor: isSelected ? regionStyles.selected.borderColor : regionStyles.default.borderColor,
-          width: '4px',
-          height: '100%',
-          cursor: 'ew-resize'
-        },
-        right: {
-          backgroundColor: isSelected ? regionStyles.selected.borderColor : regionStyles.default.borderColor,
-          width: '4px',
-          height: '100%',
-          cursor: 'ew-resize'
-        }
-      };
-
-      return style;
-    }
-    
-    const speakerColor = speakerColors[speaker] || defaultSpeakerColor;
-    const baseStyle = isSelected ? speakerColor.selected : speakerColor.default;
-    
-    // RGBA 색상 문자열에서 RGB 값 추출
-    const rgbaMatch = baseStyle.color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    let borderColor = baseStyle.color;
-    
-    if (rgbaMatch) {
-      const [_, r, g, b] = rgbaMatch;
-      borderColor = `rgba(${r}, ${g}, ${b}, 0.35)`;
-    }
-    
-    const style = {
-      color: baseStyle.color,
-      borderColor: borderColor,
-      borderWidth: 2,
-      opacity: highlightedSpeaker ? (isHighlighted ? 1 : 0.3) : 1,
-      handleStyle: {
-        left: {
-          backgroundColor: borderColor,
-          width: '4px',
-          height: '100%',
-          cursor: 'ew-resize'
-        },
-        right: {
-          backgroundColor: borderColor,
-          width: '4px',
-          height: '100%',
-          cursor: 'ew-resize'
-        }
-      }
-    };
-
-    return style;
-  }, [selectedRegionId, highlightedSpeaker]);
+  
 
   // 마우스 위치 → 시간 변환 함수
   const getTimeFromMouseEvent = (e) => {
@@ -354,103 +304,6 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
     }
   }, [onPlayingChange, playingRegion]);
 
-  // WaveSurfer 초기화
-  useEffect(() => {
-    let isMounted = true; // 이 인스턴스가 유효한지 추적
-    let abortController = new AbortController(); // fetch 취소를 위한 컨트롤러
-    
-    // 오디오 URL이 없으면 초기화하지 않음
-    if (!audioUrl && !showSample) {
-      setIsLoading(false);
-      return;
-    }
-    
-    setIsLoading(true);
-    if (!containerRef.current) return;
-    if (wavesurferRef.current) {
-      try { 
-        wavesurferRef.current.destroy(); 
-      } catch (e) {
-        console.log('Cleanup error:', e);
-      }
-      wavesurferRef.current = null;
-    }
-
-    // minPxPerSec은 최초에는 2로, 오디오 ready 후 동적으로 재설정
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: "#b0b7c3",
-      progressColor: "#b0b7c3",
-      height: WAVEFORM_HEIGHT,
-      minPxPerSec,
-      scrollParent: false,
-      fetchParams: {
-        signal: abortController.signal // fetch 요청에 signal 추가
-      }
-    });
-    const regionsPlugin = RegionsPlugin.create({
-      dragSelection: false,
-    });
-    ws.registerPlugin(regionsPlugin);
-    regionsPluginRef.current = regionsPlugin;
-
-    // 오디오 소스 결정
-    const url = showSample ? "/sample.wav" : audioUrl;
-    if (url) {
-      try {
-        ws.load(url).catch(error => {
-          if (error.name === 'AbortError') {
-            console.log('Load aborted');
-          } else {
-            console.error('Load error:', error);
-          }
-        });
-      } catch (error) {
-        console.error('Load error:', error);
-      }
-    }
-    wavesurferRef.current = ws;
-
-    // ready 이벤트 핸들러
-    const handleReady = () => {
-      // 이 인스턴스가 여전히 유효할 때만 로딩 해제
-      if (isMounted && wavesurferRef.current === ws) {
-        setIsLoading(false);
-      }
-      const duration = ws.getDuration();
-      const width = containerRef.current?.offsetWidth || 800;
-      let pxPerSec = Math.max(0.05, width / duration);
-      if (!isFinite(pxPerSec) || pxPerSec > 10) pxPerSec = 2;
-      setMinPxPerSec(pxPerSec);
-    };
-    ws.once('ready', handleReady);
-
-    // WaveSurfer 초기화 후, 재생 위치 업데이트 이벤트 등록
-    const onTimeUpdate = () => setCurrentTime(ws.getCurrentTime());
-    ws.on('timeupdate', onTimeUpdate);
-
-    // 에러 핸들러 추가
-    const handleError = (error) => {
-      console.error('WaveSurfer error:', error);
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    };
-    ws.on('error', handleError);
-
-    return () => {
-      isMounted = false; // cleanup 시 이 인스턴스는 더 이상 유효하지 않음
-      abortController.abort(); // 진행 중인 fetch 요청 취소
-      try { ws.un('ready', handleReady); } catch (e) {}
-      try { ws.un('timeupdate', onTimeUpdate); } catch (e) {}
-      try { ws.un('error', handleError); } catch (e) {}
-      try { ws.destroy(); } catch (e) {}
-      if (wavesurferRef.current === ws) {
-        wavesurferRef.current = null;
-      }
-    };
-  }, [audioUrl, showSample, minPxPerSec]);
-
   // 드래그 중 마우스 이동
   const handleWindowMouseMove = (e) => {
     const { time, x, y, globalX, globalY } = getTimeFromMouseEvent(e);
@@ -512,6 +365,14 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
             }
           });
 
+          // region 생성 후 minPxPerSec 재설정
+          if (wavesurferRef.current && containerRef.current) {
+            const duration = wavesurferRef.current.getDuration();
+            const width = containerRef.current.offsetWidth;
+            const pxPerSec = duration > 0 ? width / duration : 0.5;
+            wavesurferRef.current.setOptions({ minPxPerSec: pxPerSec });
+          }
+
           // 구간 클릭 이벤트 핸들러
           region.on('click', (e) => {
             e.stopPropagation();
@@ -550,6 +411,13 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
               if (wavesurferRef.current && wavesurferRef.current.isPlaying()) {
                 wavesurferRef.current.pause();
               }
+            }
+            // region 삭제 후 minPxPerSec 재설정
+            if (wavesurferRef.current && containerRef.current) {
+              const duration = wavesurferRef.current.getDuration();
+              const width = containerRef.current.offsetWidth;
+              const pxPerSec = duration > 0 ? width / duration : 0.5;
+              wavesurferRef.current.setOptions({ minPxPerSec: pxPerSec });
             }
           });
 
@@ -813,8 +681,11 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
     transition: 'all 0.15s',
   };
 
+  // 재생 위치 표시 및 재생바 위치 계산
   const duration = wavesurferRef.current?.getDuration?.() || 1;
-  const leftPercent = (currentTime / duration) * 100;
+  const leftPercent = (isFinite(currentTime) && isFinite(duration) && duration > 0)
+    ? (currentTime / duration) * 100
+    : 0;
 
   // 재생 상태가 바뀔 때 상위에 알림 (외부에서 재생/일시정지될 수도 있으므로)
   useEffect(() => {
@@ -926,164 +797,179 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
     return () => setIsInitialized(false);
   }, []);
 
+  // 화자 추가/삭제/선택/강조 핸들러
+  const handleAddSpeaker = () => {
+    const nextChar = String.fromCharCode(65 + speakers.length);
+    setSpeakers([...speakers, `Speaker ${nextChar}`]);
+  };
+  const handleDeleteSpeaker = () => {
+    if (speakers.length > 2) {
+      const removedSpeaker = speakers[speakers.length - 1];
+      setSpeakers(speakers.slice(0, -1));
+      if (selectedSpeaker === removedSpeaker) setSelectedSpeaker(speakers[0]);
+      if (highlightedSpeaker === removedSpeaker) setHighlightedSpeaker(null);
+      if (regionsPluginRef.current) {
+        const updatedSpeakerRegions = { ...speakerRegions };
+        let hasUpdates = false;
+        regionsPluginRef.current.getRegions().forEach(region => {
+          if (speakerRegions[region.id] === removedSpeaker) {
+            delete updatedSpeakerRegions[region.id];
+            hasUpdates = true;
+            const style = getRegionStyle(region.id, null);
+            region.setOptions(style);
+          }
+        });
+        if (hasUpdates) setSpeakerRegions(updatedSpeakerRegions);
+      }
+    }
+  };
+  const handleSelectSpeaker = (spk) => {
+    handleSpeakerSelect(spk);
+  };
+  const handleHighlightSpeaker = (spk) => {
+    setHighlightedSpeaker(spk);
+  };
+
+  // wavesurfer ready 이벤트에서 한 화면에 전체 파형이 보이도록 minPxPerSec를 동적으로 계산해 적용
+  useEffect(() => {
+    if (!wavesurferRef.current || !containerRef.current) return;
+    const ws = wavesurferRef.current;
+    const onReady = () => {
+      const duration = ws.getDuration();
+      const width = containerRef.current.offsetWidth;
+      const pxPerSec = duration > 0 ? width / duration : 0.5;
+      ws.setOptions({ minPxPerSec: pxPerSec });
+    };
+    ws.on('ready', onReady);
+    return () => {
+      ws.un('ready', onReady);
+    };
+  }, [wavesurferRef.current, containerRef.current]);
+
+  const [showRegionList, setShowRegionList] = useState(false);
+
+  const handleHideSpeaker = useCallback(() => {
+    setHiddenSpeakers(prev => {
+      const next = new Set(prev);
+      if (selectedSpeaker && next.has(selectedSpeaker)) {
+        next.delete(selectedSpeaker);
+      } else if (selectedSpeaker) {
+        next.add(selectedSpeaker);
+      }
+      return next;
+    });
+  }, [selectedSpeaker]);
+
+  // HIDE된 화자의 region을 완전히 숨김 처리
+  useEffect(() => {
+    if (!regionsPluginRef.current) return;
+    regionsPluginRef.current.getRegions().forEach(region => {
+      const speaker = speakerRegions[region.id];
+      if (region.element) {
+        if (speaker && hiddenSpeakers.has(speaker)) {
+          region.element.style.display = 'none';
+        } else {
+          region.element.style.display = '';
+        }
+      }
+    });
+  }, [hiddenSpeakers, speakerRegions]);
+
+  // 오디오 로딩 상태 관리
+  useEffect(() => {
+    if (audioUrl) setIsLoading(true);
+    else setIsLoading(false);
+  }, [audioUrl]);
+
   return (
     <>
       {/* 상단 화자 선택 버튼 */}
-      <div style={{
-        marginBottom: 18,
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 8,
-        opacity: showGuide ? 0.5 : 1,
-      }}>
+      <SpeakerManager
+        speakers={speakers}
+        selectedSpeaker={selectedSpeaker}
+        highlightedSpeaker={highlightedSpeaker}
+        onSelect={handleSelectSpeaker}
+        onHighlight={handleHighlightSpeaker}
+        onAdd={handleAddSpeaker}
+        onDelete={handleDeleteSpeaker}
+        minSpeakers={2}
+        speakerColors={speakerColors}
+        defaultSpeakerColor={defaultSpeakerColor}
+        showGuide={showGuide}
+        onShowRegionList={() => setShowRegionList(true)}
+        onHide={handleHideSpeaker}
+      />
+      {/* RegionList 모달 */}
+      {showRegionList && (
         <div style={{
-          flexGrow: 1,
-          flexBasis: 0,
-          maxWidth: 'calc(100% - 120px)',
-          height: 105, // 3줄 정도의 높이로 고정
-          overflowY: 'auto', // 스크롤바 추가
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'transparent',
+          zIndex: 2000,
           display: 'flex',
-          flexWrap: 'wrap',
-          gap: 8,
-          alignContent: 'flex-start',
-          borderRight: '1px solid #e0e0e0',
-          padding: '4px 12px', // 왼쪽 패딩 추가
-          boxSizing: 'border-box',
-        }}>
-          {speakers.map((spk) => (
-            <button
-              key={spk}
-              onClick={() => handleSpeakerSelect(spk)}
-              style={{
-                padding: '4px 12px',
-                borderRadius: 4,
-                border: '1.5px solid',
-                borderColor: speakerColors[spk]?.default.borderColor || '#e0e0e0',
-                background: (highlightedSpeaker === spk || selectedSpeaker === spk) ? 
-                  (speakerColors[spk]?.default.color || defaultSpeakerColor.default.color) : 
-                  'rgba(255, 255, 255, 0.8)',
-                color: speakerColors[spk]?.default.borderColor || '#222',
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 700,
-                minWidth: 60,
-                height: 28,
-                flexShrink: 0,
-                boxSizing: 'border-box',
-                margin: '2px 0 4px 0',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                outline: 'none',
-                position: 'relative',
-                zIndex: (highlightedSpeaker === spk || selectedSpeaker === spk) ? 1 : 'auto',
-                opacity: showGuide ? 0.5 : 1,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = speakerColors[spk]?.default.color || defaultSpeakerColor.default.color;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = (highlightedSpeaker === spk || selectedSpeaker === spk) ? 
-                  (speakerColors[spk]?.default.color || defaultSpeakerColor.default.color) : 
-                  'rgba(255, 255, 255, 0.8)';
-              }}
-              disabled={showGuide}
-            >
-              {spk}
-            </button>
-          ))}
-        </div>
-        {/* 조작 버튼: 한 행(가로)로 배치 */}
-        <div style={{ display: 'flex', flexDirection: 'row', gap: 4, minWidth: 190, paddingLeft: 12 }}>
-          <button
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+          onClick={() => setShowRegionList(false)}
+        >
+          <div
             style={{
-              padding: '3px 0',
-              borderRadius: 4,
-              border: '1.2px solid #1976d2',
-              background: '#1976d2',
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: 'pointer',
-              height: 28,
-              minWidth: 60,
+              background: '#fff',
+              borderRadius: 10,
+              boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+              minWidth: 380,
+              maxWidth: '90vw',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              position: 'relative',
             }}
-            onClick={() => {
-              const nextChar = String.fromCharCode(65 + speakers.length);
-              setSpeakers([...speakers, `Speaker ${nextChar}`]);
-            }}
-          >Add</button>
-          <button
-            style={{
-              padding: '3px 0',
-              borderRadius: 4,
-              border: '1.2px solid #b0b7c3',
-              background: '#e3e7ef',
-              color: '#222',
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: speakers.length > 2 ? 'pointer' : 'not-allowed',
-              height: 28,
-              minWidth: 60,
-            }}
-            onClick={() => {
-              if (speakers.length > 2) {
-                const removedSpeaker = speakers[speakers.length - 1];
-                setSpeakers(speakers.slice(0, -1));
-                
-                // 삭제된 화자가 현재 선택된 화자인 경우 선택 해제
-                if (selectedSpeaker === removedSpeaker) {
-                  setSelectedSpeaker(speakers[0]);
-                }
-                if (highlightedSpeaker === removedSpeaker) {
-                  setHighlightedSpeaker(null);
-                }
-
-                // 삭제된 화자의 레이블을 모두 기본값으로 변경
+            onClick={e => e.stopPropagation()}
+          >
+            <RegionList
+              hideTitle={true}
+              regions={regionsPluginRef.current ? regionsPluginRef.current.getRegions().map(r => ({
+                id: r.id,
+                start: r.start,
+                end: r.end,
+                speaker: speakerRegions[r.id] || null
+              })) : []}
+              selectedRegionId={selectedRegionId}
+              onSelect={id => {
+                setSelectedRegionId(id);
                 if (regionsPluginRef.current) {
-                  const updatedSpeakerRegions = { ...speakerRegions };
-                  let hasUpdates = false;
-
-                  // 모든 구간을 순회하면서 삭제된 화자의 레이블을 제거
-                  regionsPluginRef.current.getRegions().forEach(region => {
-                    if (speakerRegions[region.id] === removedSpeaker) {
-                      delete updatedSpeakerRegions[region.id]; // 레이블 제거
-                      hasUpdates = true;
-                      
-                      // 구간의 스타일을 기본값으로 업데이트
-                      const style = getRegionStyle(region.id, null);
-                      region.setOptions(style);
-                    }
-                  });
-
-                  // 변경된 사항이 있을 때만 상태 업데이트
-                  if (hasUpdates) {
-                    setSpeakerRegions(updatedSpeakerRegions);
+                  const region = regionsPluginRef.current.getRegions().find(r => r.id === id);
+                  if (region) {
+                    wavesurferRef.current && wavesurferRef.current.setTime(region.start);
+                    playRegion(region);
                   }
                 }
-              }
-            }}
-            disabled={speakers.length <= 2}
-          >Delete</button>
-          <button
-            style={{
-              padding: '3px 0',
-              borderRadius: 4,
-              border: '1.2px solid #b0b7c3',
-              background: '#fff',
-              color: '#1976d2',
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: 'pointer',
-              height: 28,
-              minWidth: 60,
-            }}
-            onClick={() => { /* TODO: Hide 동작 구현 */ }}
-          >Hide</button>
+              }}
+              onDelete={id => {
+                if (regionsPluginRef.current) {
+                  const region = regionsPluginRef.current.getRegions().find(r => r.id === id);
+                  if (region) {
+                    region.remove();
+                  }
+                }
+              }}
+              onEditSave={(id, start, end) => {
+                if (regionsPluginRef.current) {
+                  const region = regionsPluginRef.current.getRegions().find(r => r.id === id);
+                  if (region) {
+                    region.setOptions({ start, end });
+                  }
+                }
+              }}
+              speakerColors={speakerColors}
+              defaultSpeakerColor={defaultSpeakerColor}
+              onClose={() => setShowRegionList(false)}
+            />
+          </div>
         </div>
-      </div>
+      )}
       {/* 경계선 */}
       <div style={{
         width: '100%',
@@ -1099,8 +985,8 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
         background: '#f8f9fa',
         borderRadius: 4,
       }}>
-        {/* 로딩 또는 가이드 메시지 */}
-        {(isLoading || showGuide) && (
+        {/* 로딩 오버레이 */}
+        {(isLoading && audioUrl) && (
           <div style={{
             position: 'absolute',
             left: 0,
@@ -1116,134 +1002,154 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
             color: '#1976d2',
             fontWeight: 600,
           }}>
-            {isLoading ? (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 10,
-                opacity: 0.8,
-              }}>
-                <LoadingIcon width={28} height={28} />
-              </div>
-            ) : (
-              'Please upload audio file first'
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: 0.8 }}>
+              <LoadingIcon width={28} height={28} />
+            </div>
           </div>
         )}
-        {/* 실제 파형 컨테이너 */}
-        <div
-          ref={containerRef}
-          tabIndex={0}
-          className="waveform-container"
-          onClick={handleContainerClick}
-          onKeyDown={(e) => {
-            console.log('Any key pressed:', e.key, e.target);
-            // 디버깅을 위한 상태 출력
-            console.log('Current selectedRegionId:', selectedRegionId);
-            const regions = regionsPluginRef.current?.getRegions();
-            console.log('Available regions:', regions);
-            
-            if (
-              (e.key === 'Delete' || e.key === 'Backspace') &&
-              selectedRegionId &&
-              regionsPluginRef.current
-            ) {
-              e.preventDefault();
-              console.log('Trying to remove region:', selectedRegionId);
-              // v7 방식으로 region 삭제
-              try {
-                const regionToRemove = regions.find(r => r.id === selectedRegionId);
-                if (regionToRemove) {
-                  console.log('Found region to remove:', regionToRemove);
-                  regionToRemove.remove();
-                  console.log('Region removal attempted');
-                }
-              } catch (error) {
-                console.error('Error removing region:', error);
-              }
-              setSelectedRegionId(null);
-              setTimeout(() => {
-                console.log('After remove:', regionsPluginRef.current.getRegions());
-              }, 200);
-            }
-
-            // ▶️ 스페이스: 재생/일시정지
-            if (e.key === ' ' || e.key === 'Spacebar') {
-              e.preventDefault();
-              handlePlayPause();
-              return;
-            }
-
-            // ▶️ 오른쪽 화살표: 앞으로 가기
-            if (e.key === 'ArrowRight') {
-              e.preventDefault();
-              handleSkipForward();
-              return;
-            }
-
-            // ▶️ 왼쪽 화살표: 뒤로 가기
-            if (e.key === 'ArrowLeft') {
-              e.preventDefault();
-              handleSkipBackward();
-              return;
-            }
-          }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onMouseDown={handleMouseDown}
-          style={{
-            width: '100%',
-            height: '100%',
-            cursor: 'pointer',
+        {/* 안내 메시지 */}
+        {(!audioUrl || showGuide) && !isLoading && (
+          <div style={{
             position: 'absolute',
             left: 0,
             top: 0,
-            opacity: isLoading ? 0 : 1,
-            transition: 'opacity 0.2s ease',
-            background: showGuide ? '#fafbfc' : 'transparent',
-          }}
-        >
-          {dragBox}
-          {popup}
-          {/* 커스텀 재생 커서 오버레이 */}
-          {duration > 0 && !showGuide && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: `${leftPercent}%`,
-                width: 3,
-                height: '100%',
-                background: '#222',
-                zIndex: 20,
-                borderRadius: 2,
-                pointerEvents: 'none',
-                transform: 'translateX(-50%)',
-                display: 'block',
-              }}
-            >
-              {/* 위쪽 역삼각형 SVG 도형 */}
-              <svg
-                width="14" height="8" viewBox="0 0 14 8"
-                style={{
-                  position: 'absolute',
-                  top: -8,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  pointerEvents: 'none',
-                  display: 'block',
-                }}
-              >
-                <polygon
-                  points="7,7 1,1 13,1"
-                  fill="transparent"
-                  stroke="#222"
-                  strokeWidth="2"
+            width: '100%',
+            height: '100%',
+            background: '#f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            fontSize: 18,
+            color: '#1976d2',
+            fontWeight: 600,
+          }}>
+            Please upload audio file first
+          </div>
+        )}
+        {/* 실제 파형 컨테이너: 오디오가 있고 로딩이 끝난 후에만 렌더링 */}
+        {(audioUrl && !isLoading && !showGuide) && (
+          <div
+            ref={containerRef}
+            tabIndex={0}
+            className="waveform-container"
+            onClick={handleContainerClick}
+            onKeyDown={(e) => {
+              console.log('Any key pressed:', e.key, e.target);
+              // 디버깅을 위한 상태 출력
+              console.log('Current selectedRegionId:', selectedRegionId);
+              const regions = regionsPluginRef.current?.getRegions();
+              console.log('Available regions:', regions);
+              
+              if (
+                (e.key === 'Delete' || e.key === 'Backspace') &&
+                selectedRegionId &&
+                regionsPluginRef.current
+              ) {
+                e.preventDefault();
+                console.log('Trying to remove region:', selectedRegionId);
+                // v7 방식으로 region 삭제
+                try {
+                  const regionToRemove = regions.find(r => r.id === selectedRegionId);
+                  if (regionToRemove) {
+                    console.log('Found region to remove:', regionToRemove);
+                    regionToRemove.remove();
+                    console.log('Region removal attempted');
+                  }
+                } catch (error) {
+                  console.error('Error removing region:', error);
+                }
+                setSelectedRegionId(null);
+                setTimeout(() => {
+                  console.log('After remove:', regionsPluginRef.current.getRegions());
+                }, 200);
+              }
+
+              // ▶️ 스페이스: 재생/일시정지
+              if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                handlePlayPause();
+                return;
+              }
+
+              // ▶️ 오른쪽 화살표: 앞으로 가기
+              if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                handleSkipForward();
+                return;
+              }
+
+              // ▶️ 왼쪽 화살표: 뒤로 가기
+              if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                handleSkipBackward();
+                return;
+              }
+            }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+            style={{
+              width: '100%',
+              height: '100%',
+              cursor: 'pointer',
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              overflow: 'visible',
+              opacity: 1,
+              transition: 'opacity 0.2s ease',
+              background: showGuide ? '#fafbfc' : 'transparent',
+            }}
+          >
+            {dragBox}
+            {popup}
+            {/* 커스텀 재생 커서 오버레이 */}
+            {(duration > 0 && isFinite(currentTime)) && (
+              <>
+                {/* 세로선 */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `${leftPercent}%`,
+                    width: 2,
+                    height: '100%',
+                    background: '#111',
+                    zIndex: 15,
+                    transform: 'translateX(-1px)',
+                    pointerEvents: 'none',
+                  }}
                 />
-              </svg>
-            </div>
-          )}
-        </div>
+                {/* 역삼각형 (SVG, 흰색 내부 + 검정 테두리, 작은 크기) */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${leftPercent}%`,
+                    top: -9, // 삼각형 높이에 맞게 조정
+                    width: 12,
+                    height: 8,
+                    zIndex: 16,
+                    transform: 'translateX(-6px)',
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="12" height="8">
+                    <polygon
+                      points="6,7 2,2 10,2"
+                      fill="#fff"
+                      stroke="#111"
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
       {/* 오디오 컨트롤 영역 */}
       <div style={{
@@ -1416,7 +1322,11 @@ export default function WaveformLabeler({ audioUrl, audioFile, showSample, showG
           fontWeight: 500,
           opacity: (!showGuide && wavesurferRef.current) ? 1 : 0.5,
         }}>
-          {(!showGuide && wavesurferRef.current) ? formatTimeFull(currentTime) : '00:00:00.000'}
+          {(!showGuide && wavesurferRef.current)
+            ? (isFinite(currentTime) && !isNaN(currentTime)
+                ? formatTimeFull(currentTime)
+                : '00:00:00.000')
+            : '00:00:00.000'}
         </div>
       </div>
     </>
