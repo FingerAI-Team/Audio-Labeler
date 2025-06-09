@@ -5,8 +5,8 @@ export const regionStyles = {
     borderWidth: 2
   },
   selected: {
-    color: 'rgba(25, 118, 210, 0.35)',
-    borderColor: 'rgba(25, 118, 210, 0.45)',
+    color: 'rgba(120, 120, 120, 0.5)',
+    borderColor: 'rgba(120, 120, 120, 0.8)',
     borderWidth: 2
   }
 }; 

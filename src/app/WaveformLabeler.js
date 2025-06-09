@@ -875,10 +875,8 @@ export default function WaveformLabeler(props) {
     });
   }, [hiddenSpeakers, speakerRegions]);
 
-  // 오디오 로딩 상태 관리
   useEffect(() => {
-    if (audioUrl) setIsLoading(true);
-    else setIsLoading(false);
+    setIsLoading(true);
   }, [audioUrl]);
 
   return (
@@ -985,8 +983,8 @@ export default function WaveformLabeler(props) {
         background: '#f8f9fa',
         borderRadius: 4,
       }}>
-        {/* 로딩 오버레이 */}
-        {(isLoading && audioUrl) && (
+        {/* 로딩 또는 가이드 메시지 */}
+        {(isLoading || showGuide) && (
           <div style={{
             position: 'absolute',
             left: 0,
@@ -1002,154 +1000,136 @@ export default function WaveformLabeler(props) {
             color: '#1976d2',
             fontWeight: 600,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: 0.8 }}>
-              <LoadingIcon width={28} height={28} />
-            </div>
-          </div>
-        )}
-        {/* 안내 메시지 */}
-        {(!audioUrl || showGuide) && !isLoading && (
-          <div style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: '100%',
-            height: '100%',
-            background: '#f8f9fa',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            fontSize: 18,
-            color: '#1976d2',
-            fontWeight: 600,
-          }}>
-            Please upload audio file first
-          </div>
-        )}
-        {/* 실제 파형 컨테이너: 오디오가 있고 로딩이 끝난 후에만 렌더링 */}
-        {(audioUrl && !isLoading && !showGuide) && (
-          <div
-            ref={containerRef}
-            tabIndex={0}
-            className="waveform-container"
-            onClick={handleContainerClick}
-            onKeyDown={(e) => {
-              console.log('Any key pressed:', e.key, e.target);
-              // 디버깅을 위한 상태 출력
-              console.log('Current selectedRegionId:', selectedRegionId);
-              const regions = regionsPluginRef.current?.getRegions();
-              console.log('Available regions:', regions);
-              
-              if (
-                (e.key === 'Delete' || e.key === 'Backspace') &&
-                selectedRegionId &&
-                regionsPluginRef.current
-              ) {
-                e.preventDefault();
-                console.log('Trying to remove region:', selectedRegionId);
-                // v7 방식으로 region 삭제
-                try {
-                  const regionToRemove = regions.find(r => r.id === selectedRegionId);
-                  if (regionToRemove) {
-                    console.log('Found region to remove:', regionToRemove);
-                    regionToRemove.remove();
-                    console.log('Region removal attempted');
-                  }
-                } catch (error) {
-                  console.error('Error removing region:', error);
-                }
-                setSelectedRegionId(null);
-                setTimeout(() => {
-                  console.log('After remove:', regionsPluginRef.current.getRegions());
-                }, 200);
-              }
-
-              // ▶️ 스페이스: 재생/일시정지
-              if (e.key === ' ' || e.key === 'Spacebar') {
-                e.preventDefault();
-                handlePlayPause();
-                return;
-              }
-
-              // ▶️ 오른쪽 화살표: 앞으로 가기
-              if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                handleSkipForward();
-                return;
-              }
-
-              // ▶️ 왼쪽 화살표: 뒤로 가기
-              if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                handleSkipBackward();
-                return;
-              }
-            }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onMouseDown={handleMouseDown}
-            style={{
-              width: '100%',
-              height: '100%',
-              cursor: 'pointer',
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              overflow: 'visible',
-              opacity: 1,
-              transition: 'opacity 0.2s ease',
-              background: showGuide ? '#fafbfc' : 'transparent',
-            }}
-          >
-            {dragBox}
-            {popup}
-            {/* 커스텀 재생 커서 오버레이 */}
-            {(duration > 0 && isFinite(currentTime)) && (
-              <>
-                {/* 세로선 */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: `${leftPercent}%`,
-                    width: 2,
-                    height: '100%',
-                    background: '#111',
-                    zIndex: 15,
-                    transform: 'translateX(-1px)',
-                    pointerEvents: 'none',
-                  }}
-                />
-                {/* 역삼각형 (SVG, 흰색 내부 + 검정 테두리, 작은 크기) */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${leftPercent}%`,
-                    top: -9, // 삼각형 높이에 맞게 조정
-                    width: 12,
-                    height: 8,
-                    zIndex: 16,
-                    transform: 'translateX(-6px)',
-                    pointerEvents: 'none',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <svg width="12" height="8">
-                    <polygon
-                      points="6,7 2,2 10,2"
-                      fill="#fff"
-                      stroke="#111"
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                </div>
-              </>
+            {isLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: 0.8 }}>
+                <LoadingIcon width={28} height={28} />
+              </div>
+            ) : (
+              'Please upload audio file first'
             )}
           </div>
         )}
+        {/* 실제 파형 컨테이너: 항상 렌더링 */}
+        <div
+          ref={containerRef}
+          tabIndex={0}
+          className="waveform-container"
+          onClick={handleContainerClick}
+          onKeyDown={(e) => {
+            console.log('Any key pressed:', e.key, e.target);
+            // 디버깅을 위한 상태 출력
+            console.log('Current selectedRegionId:', selectedRegionId);
+            const regions = regionsPluginRef.current?.getRegions();
+            console.log('Available regions:', regions);
+            
+            if (
+              (e.key === 'Delete' || e.key === 'Backspace') &&
+              selectedRegionId &&
+              regionsPluginRef.current
+            ) {
+              e.preventDefault();
+              console.log('Trying to remove region:', selectedRegionId);
+              // v7 방식으로 region 삭제
+              try {
+                const regionToRemove = regions.find(r => r.id === selectedRegionId);
+                if (regionToRemove) {
+                  console.log('Found region to remove:', regionToRemove);
+                  regionToRemove.remove();
+                  console.log('Region removal attempted');
+                }
+              } catch (error) {
+                console.error('Error removing region:', error);
+              }
+              setSelectedRegionId(null);
+              setTimeout(() => {
+                console.log('After remove:', regionsPluginRef.current.getRegions());
+              }, 200);
+            }
+
+            // ▶️ 스페이스: 재생/일시정지
+            if (e.key === ' ' || e.key === 'Spacebar') {
+              e.preventDefault();
+              handlePlayPause();
+              return;
+            }
+
+            // ▶️ 오른쪽 화살표: 앞으로 가기
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              handleSkipForward();
+              return;
+            }
+
+            // ▶️ 왼쪽 화살표: 뒤로 가기
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              handleSkipBackward();
+              return;
+            }
+          }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onMouseDown={handleMouseDown}
+          style={{
+            width: '100%',
+            height: '100%',
+            cursor: 'pointer',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            overflow: 'visible',
+            opacity: isLoading ? 0 : 1,
+            transition: 'opacity 0.2s ease',
+            background: showGuide ? '#fafbfc' : 'transparent',
+          }}
+        >
+          {dragBox}
+          {popup}
+          {/* 커스텀 재생 커서 오버레이 */}
+          {(audioUrl && duration > 0 && isFinite(currentTime) && !showGuide && !isLoading) && (
+            <>
+              {/* 세로선 */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: `${leftPercent}%`,
+                  width: 2,
+                  height: '100%',
+                  background: '#111',
+                  zIndex: 15,
+                  transform: 'translateX(-1px)',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* 역삼각형 (SVG, 흰색 내부 + 검정 테두리, 작은 크기) */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${leftPercent}%`,
+                  top: -9, // 삼각형 높이에 맞게 조정
+                  width: 12,
+                  height: 8,
+                  zIndex: 16,
+                  transform: 'translateX(-6px)',
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg width="12" height="8">
+                  <polygon
+                    points="6,7 2,2 10,2"
+                    fill="#fff"
+                    stroke="#111"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </div>
+            </>
+          )}
+        </div>
       </div>
       {/* 오디오 컨트롤 영역 */}
       <div style={{
