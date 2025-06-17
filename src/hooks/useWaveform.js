@@ -42,6 +42,7 @@ export default function useWaveform({
       minPxPerSec,
       scrollParent: false,
       fetchParams: { signal: abortController.signal },
+      autoScroll: false,
     });
     const regionsPlugin = RegionsPlugin.create({ dragSelection: false });
     ws.registerPlugin(regionsPlugin);

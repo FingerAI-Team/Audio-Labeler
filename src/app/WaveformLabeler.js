@@ -135,10 +135,53 @@ export default function WaveformLabeler(props) {
   const [showSpeedSetting, setShowSpeedSetting] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [playingRegion, setPlayingRegion] = useState(null);
-  // 구간 스타일 적용 함수 수정
-  
 
-  // 마우스 위치 → 시간 변환 함수
+  // playRegion: region의 시작점부터 재생
+  const playRegion = useCallback((region) => {
+    if (!wavesurferRef.current || !region) return;
+    if (playingRegion === region.id && wavesurferRef.current.isPlaying()) {
+      // 이미 해당 region이 재생 중이면 중복 호출 금지
+      return;
+    }
+    const ws = wavesurferRef.current;
+    try {
+      if (ws.isPlaying()) {
+        ws.pause();
+        setIsPlaying(false);
+        setPlayingRegion(null);
+        if (onPlayingChange) onPlayingChange(false);
+        setTimeout(() => {
+          ws.setTime(region.start);
+          ws.play(region.start).catch(error => {
+            setIsPlaying(false);
+            setPlayingRegion(null);
+            if (onPlayingChange) onPlayingChange(false);
+          });
+          setIsPlaying(true);
+          setPlayingRegion(region.id);
+          if (onPlayingChange) onPlayingChange(true);
+        }, 300);
+        return;
+      }
+      setIsPlaying(false);
+      setPlayingRegion(null);
+      ws.setTime(region.start);
+      ws.play(region.start).catch(error => {
+        setIsPlaying(false);
+        setPlayingRegion(null);
+        if (onPlayingChange) onPlayingChange(false);
+      });
+      setIsPlaying(true);
+      setPlayingRegion(region.id);
+      if (onPlayingChange) onPlayingChange(true);
+    } catch (error) {
+      setIsPlaying(false);
+      setPlayingRegion(null);
+      if (onPlayingChange) onPlayingChange(false);
+    }
+  }, [onPlayingChange, playingRegion]);
+
+  // getTimeFromMouseEvent: 마우스 위치를 전체 오디오 길이 기준 시간으로 변환
   const getTimeFromMouseEvent = (e) => {
     if (!containerRef.current || !wavesurferRef.current) return { time: 0, x: 0, y: 0, globalX: 0, globalY: 0 };
     const rect = containerRef.current.getBoundingClientRect();
@@ -149,160 +192,6 @@ export default function WaveformLabeler(props) {
     const time = Math.max(0, Math.min(duration, (x / width) * duration));
     return { time, x, y, globalX: e.clientX, globalY: e.clientY };
   };
-
-  // 구간 재생 함수 수정
-  const playRegion = useCallback((region) => {
-    if (!wavesurferRef.current || !region) {
-      console.log('No wavesurfer or region');
-      return;
-    }
-    
-    const ws = wavesurferRef.current;
-    
-    try {
-      // 현재 재생 중이면 정지
-      if (ws.isPlaying()) {
-        console.log('Stopping current playback');
-        ws.pause();
-        setIsPlaying(false);
-        setPlayingRegion(null);
-        if (onPlayingChange) onPlayingChange(false);
-        return;
-      }
-
-      // 재생 전 상태 초기화
-      setIsPlaying(false);
-      setPlayingRegion(null);
-      if (onPlayingChange) onPlayingChange(false);
-
-      // 약간의 지연 후 재생 시작
-      setTimeout(() => {
-        if (!ws.isPlaying()) {  // 재생 중이 아닐 때만 시작
-          console.log('Starting playback');
-          ws.play().catch(error => {
-            console.error('Playback error:', error);
-            setIsPlaying(false);
-            setPlayingRegion(null);
-            if (onPlayingChange) onPlayingChange(false);
-          });
-          setIsPlaying(true);
-          setPlayingRegion(region.id);
-          if (onPlayingChange) onPlayingChange(true);
-        }
-      }, 100);
-
-    } catch (error) {
-      console.error('Error playing region:', error);
-      setIsPlaying(false);
-      setPlayingRegion(null);
-      if (onPlayingChange) onPlayingChange(false);
-    }
-  }, [onPlayingChange]);
-
-  // 재생/일시정지 함수를 두 번째로 정의
-  const handlePlayPause = useCallback(() => {
-    if (!wavesurferRef.current) return;
-    
-    if (wavesurferRef.current.isPlaying()) {
-      wavesurferRef.current.pause();
-      setIsPlaying(false);
-      setPlayingRegion(null);
-      if (onPlayingChange) onPlayingChange(false);
-    } else {
-      // 선택된 구간이 있으면 해당 구간 재생
-      if (selectedRegionId && regionsPluginRef.current) {
-        const region = regionsPluginRef.current.getRegions().find(r => r.id === selectedRegionId);
-        if (region) {
-          playRegion(region);
-          return;
-        }
-      }
-      
-      // 없으면 현재 위치에서 일반 재생
-      const currentTime = wavesurferRef.current.getCurrentTime();
-      setTimeout(() => {
-        wavesurferRef.current.play(currentTime).catch(error => {
-          console.error('Playback error:', error);
-          setIsPlaying(false);
-          if (onPlayingChange) onPlayingChange(false);
-        });
-        setIsPlaying(true);
-        if (onPlayingChange) onPlayingChange(true);
-      }, 50);
-    }
-  }, [selectedRegionId, onPlayingChange, playRegion]);
-
-  // 구간 이동 함수들을 마지막으로 정의
-  const handleSkipBackward = useCallback(() => {
-    if (wavesurferRef.current) {
-      const current = wavesurferRef.current.getCurrentTime();
-      const newTime = Math.max(0, current - 10);
-      
-      // 현재 재생 상태와 구간 정보 저장
-      const wasPlaying = wavesurferRef.current.isPlaying();
-      const currentRegion = playingRegion ? regionsPluginRef.current?.getRegions().find(r => r.id === playingRegion) : null;
-      
-      // 재생 중이면 일시 정지
-      if (wasPlaying) {
-        wavesurferRef.current.pause();
-      }
-      
-      // 새로운 위치로 이동
-      wavesurferRef.current.setTime(newTime);
-      
-      // 재생 중이었다면 새로운 위치에서 재생 시작
-      if (wasPlaying) {
-        if (currentRegion && newTime >= currentRegion.start && newTime <= currentRegion.end) {
-          // 구간 내부로 이동한 경우 해당 위치부터 구간 재생
-          wavesurferRef.current.play(newTime);
-          setIsPlaying(true);
-          if (onPlayingChange) onPlayingChange(true);
-        } else {
-          // 구간 밖으로 이동한 경우 일반 재생으로 전환
-          setPlayingRegion(null);
-          wavesurferRef.current.play(newTime);
-          setIsPlaying(true);
-          if (onPlayingChange) onPlayingChange(true);
-        }
-      }
-    }
-  }, [onPlayingChange, playingRegion]);
-
-  const handleSkipForward = useCallback(() => {
-    if (wavesurferRef.current) {
-      const current = wavesurferRef.current.getCurrentTime();
-      const duration = wavesurferRef.current.getDuration();
-      const newTime = Math.min(duration, current + 10);
-      
-      // 현재 재생 상태와 구간 정보 저장
-      const wasPlaying = wavesurferRef.current.isPlaying();
-      const currentRegion = playingRegion ? regionsPluginRef.current?.getRegions().find(r => r.id === playingRegion) : null;
-      
-      // 재생 중이면 일시 정지
-      if (wasPlaying) {
-        wavesurferRef.current.pause();
-      }
-      
-      // 새로운 위치로 이동
-      wavesurferRef.current.setTime(newTime);
-      
-      // 재생 중이었다면 새로운 위치에서 재생 시작
-      if (wasPlaying) {
-        if (currentRegion && newTime >= currentRegion.start && newTime <= currentRegion.end) {
-          // 구간 내부로 이동한 경우 해당 위치부터 구간 재생
-          wavesurferRef.current.play(newTime);
-          setIsPlaying(true);
-          if (onPlayingChange) onPlayingChange(true);
-        } else {
-          // 구간 밖으로 이동한 경우 일반 재생으로 전환
-          setPlayingRegion(null);
-          wavesurferRef.current.play(newTime);
-          setIsPlaying(true);
-          if (onPlayingChange) onPlayingChange(true);
-        }
-      }
-    }
-  }, [onPlayingChange, playingRegion]);
 
   // 드래그 중 마우스 이동
   const handleWindowMouseMove = (e) => {
@@ -365,14 +254,6 @@ export default function WaveformLabeler(props) {
             }
           });
 
-          // region 생성 후 minPxPerSec 재설정
-          if (wavesurferRef.current && containerRef.current) {
-            const duration = wavesurferRef.current.getDuration();
-            const width = containerRef.current.offsetWidth;
-            const pxPerSec = duration > 0 ? width / duration : 0.5;
-            wavesurferRef.current.setOptions({ minPxPerSec: pxPerSec });
-          }
-
           // 구간 클릭 이벤트 핸들러
           region.on('click', (e) => {
             e.stopPropagation();
@@ -411,13 +292,6 @@ export default function WaveformLabeler(props) {
               if (wavesurferRef.current && wavesurferRef.current.isPlaying()) {
                 wavesurferRef.current.pause();
               }
-            }
-            // region 삭제 후 minPxPerSec 재설정
-            if (wavesurferRef.current && containerRef.current) {
-              const duration = wavesurferRef.current.getDuration();
-              const width = containerRef.current.offsetWidth;
-              const pxPerSec = duration > 0 ? width / duration : 0.5;
-              wavesurferRef.current.setOptions({ minPxPerSec: pxPerSec });
             }
           });
 
@@ -557,35 +431,28 @@ export default function WaveformLabeler(props) {
     }
   }
 
-  // 재생 위치 모니터링
+  // 재생 위치 모니터링 (구간 끝 도달 시 정지)
   useEffect(() => {
     if (!wavesurferRef.current || !playingRegion || !regionsPluginRef.current) return;
-
     const ws = wavesurferRef.current;
     const region = regionsPluginRef.current.getRegions().find(r => r.id === playingRegion);
-    
     if (!region) {
-      console.log('No region found for playback monitoring');
       setPlayingRegion(null);
       return;
     }
-
-    console.log('Setting up playback monitoring for region:', region.id);
     const checkTime = () => {
-      if (!ws.isPlaying()) return; // 재생 중이 아니면 체크하지 않음
-      
+      if (!ws.isPlaying()) return;
       const currentTime = ws.getCurrentTime();
-      if (currentTime >= region.end) {
-        console.log('Reached region end, stopping playback');
+      const regionEnd = region.end;
+      if (currentTime >= regionEnd) {
         ws.pause();
-        ws.setTime(region.start); // 구간 끝에서 다시 시작 위치로 이동
+        ws.setTime(region.start);
         setIsPlaying(false);
+        setPlayingRegion(null);
         if (onPlayingChange) onPlayingChange(false);
       }
     };
-
-    const intervalId = setInterval(checkTime, 10); // 더 정확한 체크를 위해 간격 줄임
-    
+    const intervalId = setInterval(checkTime, 10);
     return () => {
       clearInterval(intervalId);
     };
@@ -683,9 +550,14 @@ export default function WaveformLabeler(props) {
 
   // 재생 위치 표시 및 재생바 위치 계산
   const duration = wavesurferRef.current?.getDuration?.() || 1;
-  const leftPercent = (isFinite(currentTime) && isFinite(duration) && duration > 0)
-    ? (currentTime / duration) * 100
-    : 0;
+  let leftPercent = 0;
+  let showCursor = true;
+  if (isFinite(currentTime) && isFinite(duration) && duration > 0) {
+    leftPercent = (currentTime / duration) * 100;
+    showCursor = true;
+  } else {
+    showCursor = false;
+  }
 
   // 재생 상태가 바뀔 때 상위에 알림 (외부에서 재생/일시정지될 수도 있으므로)
   useEffect(() => {
@@ -838,7 +710,7 @@ export default function WaveformLabeler(props) {
       const duration = ws.getDuration();
       const width = containerRef.current.offsetWidth;
       const pxPerSec = duration > 0 ? width / duration : 0.5;
-      ws.setOptions({ minPxPerSec: pxPerSec });
+      ws.setOptions({ minPxPerSec: pxPerSec, autoScroll: false });
     };
     ws.on('ready', onReady);
     return () => {
@@ -879,8 +751,116 @@ export default function WaveformLabeler(props) {
     setIsLoading(true);
   }, [audioUrl]);
 
+  // 오디오가 없을 때 로딩 UI가 계속 보이지 않도록 처리
+  useEffect(() => {
+    if (!audioUrl) setIsLoading(false);
+  }, [audioUrl]);
+
+  // 구간보기 상태에서 파형 스크롤을 항상 0으로 고정하는 useEffect
+  useEffect(() => {
+    if (
+      wavesurferRef.current &&
+      wavesurferRef.current.drawer &&
+      wavesurferRef.current.drawer.wrapper
+    ) {
+      const wrapper = wavesurferRef.current.drawer.wrapper;
+      const handleScroll = () => {
+        if (wrapper.scrollLeft !== 0) wrapper.scrollLeft = 0;
+      };
+      wrapper.addEventListener('scroll', handleScroll);
+      return () => {
+        wrapper.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [wavesurferRef.current]);
+
+  const handlePlayPause = useCallback(() => {
+    if (!wavesurferRef.current) return;
+    if (wavesurferRef.current.isPlaying()) {
+      wavesurferRef.current.pause();
+      setIsPlaying(false);
+      setPlayingRegion(null);
+      if (onPlayingChange) onPlayingChange(false);
+    } else {
+      // 선택된 구간이 있으면 해당 구간 재생
+      if (selectedRegionId && regionsPluginRef.current) {
+        const region = regionsPluginRef.current.getRegions().find(r => r.id === selectedRegionId);
+        if (region) {
+          playRegion(region);
+          return;
+        }
+      }
+      // 없으면 현재 위치에서 일반 재생
+      let playTime = wavesurferRef.current.getCurrentTime();
+      setTimeout(() => {
+        wavesurferRef.current.setTime(playTime);
+        wavesurferRef.current.play(playTime).catch(error => {
+          setIsPlaying(false);
+          if (onPlayingChange) onPlayingChange(false);
+        });
+        setIsPlaying(true);
+        if (onPlayingChange) onPlayingChange(true);
+      }, 50);
+    }
+  }, [selectedRegionId, onPlayingChange, playRegion]);
+
+  const [isSeeking, setIsSeeking] = useState(false);
+
+  const handleSkipForward = useCallback(() => {
+    if (isSeeking) return;
+    setIsSeeking(true);
+    if (wavesurferRef.current) {
+      let current = wavesurferRef.current.getCurrentTime();
+      let newTime = current + 10;
+      const duration = wavesurferRef.current.getDuration();
+      newTime = Math.min(duration, newTime);
+      const wasPlaying = wavesurferRef.current.isPlaying();
+      if (wasPlaying) {
+        wavesurferRef.current.pause();
+        setTimeout(() => {
+          wavesurferRef.current.setTime(newTime);
+          wavesurferRef.current.play(newTime);
+          setIsPlaying(true);
+          setIsSeeking(false);
+          if (onPlayingChange) onPlayingChange(true);
+        }, 300);
+      } else {
+        wavesurferRef.current.setTime(newTime);
+        setIsSeeking(false);
+      }
+    } else {
+      setIsSeeking(false);
+    }
+  }, [onPlayingChange, isSeeking]);
+
+  const handleSkipBackward = useCallback(() => {
+    if (isSeeking) return;
+    setIsSeeking(true);
+    if (wavesurferRef.current) {
+      let current = wavesurferRef.current.getCurrentTime();
+      let newTime = current - 10;
+      newTime = Math.max(0, newTime);
+      const wasPlaying = wavesurferRef.current.isPlaying();
+      if (wasPlaying) {
+        wavesurferRef.current.pause();
+        setTimeout(() => {
+          wavesurferRef.current.setTime(newTime);
+          wavesurferRef.current.play(newTime);
+          setIsPlaying(true);
+          setIsSeeking(false);
+          if (onPlayingChange) onPlayingChange(true);
+        }, 300);
+      } else {
+        wavesurferRef.current.setTime(newTime);
+        setIsSeeking(false);
+      }
+    } else {
+      setIsSeeking(false);
+    }
+  }, [onPlayingChange, isSeeking]);
+
   return (
-    <>
+    <div>
       {/* 상단 화자 선택 버튼 */}
       <SpeakerManager
         speakers={speakers}
@@ -951,6 +931,12 @@ export default function WaveformLabeler(props) {
                   if (region) {
                     region.remove();
                   }
+                  // 삭제 후 강제 스타일 갱신 및 선택 해제
+                  regionsPluginRef.current.getRegions().forEach(r => {
+                    const style = getRegionStyle(r.id, speakerRegions[r.id]);
+                    r.setOptions(style);
+                  });
+                  setSelectedRegionId(null);
                 }
               }}
               onEditSave={(id, start, end) => {
@@ -1086,7 +1072,7 @@ export default function WaveformLabeler(props) {
           {dragBox}
           {popup}
           {/* 커스텀 재생 커서 오버레이 */}
-          {(audioUrl && duration > 0 && isFinite(currentTime) && !showGuide && !isLoading) && (
+          {(audioUrl && duration > 0 && isFinite(currentTime) && !showGuide && !isLoading && showCursor) && (
             <>
               {/* 세로선 */}
               <div
@@ -1309,6 +1295,6 @@ export default function WaveformLabeler(props) {
             : '00:00:00.000'}
         </div>
       </div>
-    </>
+    </div>
   );
 }
